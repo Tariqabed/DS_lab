@@ -87,5 +87,5 @@ class Start_SudokuGUI(Sudoku_GUI):
                 
 if __name__ == "__main__":
     app = Start_SudokuGUI()
-    print("Hey")
+
 
