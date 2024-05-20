@@ -37,6 +37,7 @@ class Sudoku_structure:
 
 
     def Sodku_creator(self,diffculty_level):
+        self.matrix = np.zeros((self.dim , self.dim)).astype(int)
         numbers1_self_dim = np.arange(1, self.dim + 1)
         array1= np.random.choice(numbers1_self_dim, size=len(numbers1_self_dim), replace=False)
         array2 = np.random.choice(numbers1_self_dim-1, size=len(numbers1_self_dim), replace=False)
@@ -92,8 +93,3 @@ class Sudoku_structure:
                 self.matrix[row][col] = 0
                 
         return False
-                
-
-
-
-
