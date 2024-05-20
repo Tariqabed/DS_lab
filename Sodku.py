@@ -46,11 +46,11 @@ class Sudoku_structure:
         self.delete_elements(diffculty_level)
         
     def delete_elements(self, diffculty_level):
-        if diffculty_level > 70 or diffculty_level < 30 :
+        if not diffculty_level.isdigit() or not (30 <= int(diffculty_level) <= 70 ) :
             print(" not accepted diffculty level 30 - 70 , default = 50 ")
             diffculty_level = 50 
 
-            
+        diffculty_level=int(diffculty_level)
         num_elements = int(self.matrix.size * diffculty_level / 100)
 
         random_indices = np.random.choice(self.matrix.size, size=num_elements, replace=False)

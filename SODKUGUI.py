@@ -5,7 +5,7 @@ from Sodku import *
 class Sudoku_GUI(Sudoku_structure):
     def __init__(self,dim,diffculty):
         self.dim = int(dim)         
-        self.diffculty = int(diffculty)
+        self.diffculty = diffculty
         self.root = Tk()
         self.root.title("Sudoku")
         
@@ -41,13 +41,12 @@ class Sudoku_GUI(Sudoku_structure):
     def on_enter(self,event):
         entry = event.widget 
         index = np.unravel_index(int((''.join(re.findall(r'\d', str(event.widget)))))-1,self.matrix.shape)
+        self.matrix[index] = entry.get()
+        self.matrix_entries.insert(0,entry.get())
         
         if self.enter_element(index[0] , index[1] , int(entry.get())):
-            self.matrix[index] = entry.get()
+            self.matrix_entries.configure(bg = "lightred")
         
-            
-        
-        print(self.matrix) 
         
         
         
