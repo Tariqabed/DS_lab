@@ -1,6 +1,7 @@
 import numpy as np 
 import sympy as sp 
 import random
+from tkinter import * 
 
 ##There should be a meeting on how to convert the matrix from 9 dimnsional into 16 dimnsional because i think this should start to be planned to from the begining ##
 
@@ -60,14 +61,14 @@ class Sudoku_structure:
         
     
                 
-    def solveSudoku(self, row=0, col=0):
+    def solveSudoku(self, row=0, col=0,creator=True):
         if row == self.dim - 1 and col == self.dim: return True 
             
         if col == self.dim: row, col = row + 1, 0
         
         if self.matrix[row][col] != 0:
             
-            return self.solveSudoku(row, col + 1)
+            return self.solveSudoku(row, col + 1,creator)
                 ## A trick to make the matrix more reasonable in terms of time complexity##
         
         elements = set(range(1, self.dim + 1))
@@ -83,13 +84,14 @@ class Sudoku_structure:
         for num in possible_elements:
             
             if self.enter_element(row, col, num):
-                
+                if creator is False :
+                    self.entries_index[row , col].insert(0,str(num))
                 self.matrix[row][col] = num
 
-                if self.solveSudoku(row, col + 1):
-                    
+                if self.solveSudoku(row, col + 1,creator):
                     return True
-            
-                self.matrix[row][col] = 0
+                
+            if creator is False : self.entries_index[row , col].delete(0,END)
+            self.matrix[row][col] = 0
                 
         return False
