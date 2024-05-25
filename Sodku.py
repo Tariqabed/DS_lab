@@ -2,8 +2,8 @@ import numpy as np
 import sympy as sp 
 import random
 from tkinter import * 
-
-##There should be a meeting on how to convert the matrix from 9 dimnsional into 16 dimnsional because i think this should start to be planned to from the begining ##
+import time 
+import datetime
 
 
 class Sudoku_structure:  
@@ -44,12 +44,7 @@ class Sudoku_structure:
         array2 = np.random.choice(numbers1_self_dim-1, size=len(numbers1_self_dim), replace=False)
         self.matrix[(array1 - np.ones(self.dim)).astype(int),array2] = array1
         self.solveSudoku()
-        self.delete_elements(diffculty_level)
-        
-    def delete_elements(self, diffculty_level):
-        if not diffculty_level.isdigit() or not (30 <= int(diffculty_level) <= 70 ) :
-            print(" not accepted diffculty level 30 - 70 , default = 50 ")
-            diffculty_level = 50 
+
 
         diffculty_level=int(diffculty_level)
         num_elements = int(self.matrix.size * diffculty_level / 100)
@@ -58,7 +53,6 @@ class Sudoku_structure:
         row_indices, col_indices = np.unravel_index(random_indices, self.matrix.shape)
     
         self.matrix[row_indices, col_indices] = 0
-        
     
                 
     def solveSudoku(self, row=0, col=0,creator=True):
