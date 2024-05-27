@@ -53,7 +53,37 @@ class Sudoku_structure:
         row_indices, col_indices = np.unravel_index(random_indices, self.matrix.shape)
     
         self.matrix[row_indices, col_indices] = 0
+    def elements_set(self, row, col):
+        """Determines the possible elements that can be placed in a cell at (row, col)."""
+        all_elements = set(range(1, self.dim + 1))
+
+        # Get unique elements in the row
+        row_elements = set(self.unique_elements(self.matrix[row])[1])
+
+        # Get unique elements in the column
+        col_elements = set(self.unique_elements(self.matrix[:, col])[1])
+
+        # Get unique elements in the subgrid
+        sqrt_dim = int(np.sqrt(self.dim))
+        subgrid_start_row = row - row % sqrt_dim
+        subgrid_start_col = col - col % sqrt_dim
+        subgrid_elements = set(self.used_in_matrix(subgrid_start_row, subgrid_start_col)[1])
+
+        # Determine possible elements for the cell by excluding used elements
+        used_elements = row_elements.union(col_elements).union(subgrid_elements)
+        possible_elements = list(all_elements.difference(used_elements))
+
+        return possible_elements
+        
     
+    def allowed_in_cell(self):
+        self.allowed_numbers = np.zeros((self.dim , self.dim)).astype(list)
+        
+        for i in range(self.dim):
+            for j in range(self.dim):
+                self.allowed_numbers[i,j] = self.elements_set(i, j)
+                
+        return self.allowed_numbers
                 
     def solveSudoku(self, row=0, col=0,creator=True):
         if row == self.dim - 1 and col == self.dim: return True 
@@ -64,17 +94,8 @@ class Sudoku_structure:
             
             return self.solveSudoku(row, col + 1,creator)
                 ## A trick to make the matrix more reasonable in terms of time complexity##
-        
-        elements = set(range(1, self.dim + 1))
-        
-        row_elements = set(self.unique_elements(self.matrix[row])[1])  # Check and implement unique_elements    ##we are trying only to take elements we need##
-        
-        col_elements = set(self.unique_elements(self.matrix[:, col])[1])  # Check and implement unique_elements
-        
-        small_matrix_elements = set(self.used_in_matrix(row - row % int(np.sqrt(self.dim)), col - col % int(np.sqrt(self.dim)))[1])  # Check and implement used_in_matrix
+        possible_elements = self.elements_set(row , col)
 
-        possible_elements = list(elements.difference(small_matrix_elements.union(row_elements.union(col_elements))))    ##I am putting a lot of spaces to make it more readable ##
-        
         for num in possible_elements:
             
             if self.enter_element(row, col, num):
