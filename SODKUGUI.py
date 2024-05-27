@@ -21,6 +21,9 @@ class Sudoku_GUI(Sudoku_structure):
         self.counter = 0
         self.create_entries()
         
+        
+        
+        
         self.start_timer()
         
         self.root.mainloop()
@@ -91,18 +94,11 @@ class Sudoku_GUI(Sudoku_structure):
             self.total_seconds -=1
             self.time_label.config(text = self.format_time())
             self.root.after(1000 , self.update_timer)
-            
-
 
     def format_time(self):
-
         minutes, seconds = divmod(self.total_seconds, 60)
         return f"{minutes:02}:{seconds:02}"
-        
     
-    
-        
-
     def create_game(self):
         self.root.destroy()
         Start_SudokuGUI()
