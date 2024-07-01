@@ -1,4 +1,4 @@
-from sudoku_better_version_ import SolveAC  # Replace with your solver import
+from generate_sudoku import SolveAC , GenerateSudoku
 import numpy as np
 import sympy as sp
 import random
@@ -12,57 +12,72 @@ import multiprocessing
 from multiprocessing import Pool
 import copy
 import time
-from CTkMenuBar import *
 import re
 import customtkinter
 from tkinter import filedialog
 
 from functools import partial
 
-
 solver = SolveAC()
+
+GenerateSudoku = GenerateSudoku()
+
+
+
 class Sudoku_GUI:
     def __init__(self, dim, difficulty):
+            self.initialize_solver(dim, difficulty)
+            solver.grid_insert(solver.create_sudoku(), solver.dim)
+            self.setup_gui()
+
+    def initialize_solver(self, dim, difficulty):
         solver.domains = {}
         solver.related_cells = {}
-        solver.dim = int(dim)
-        solver.grid_dim = np.sqrt(int(dim))
         solver.length_values = {}
         solver.solution = list()
 
         solver.dim = int(dim)
+        solver.grid_dim = np.sqrt(int(dim))
         solver.difficulty = difficulty
-        solver.grid_insert(solver.create_sudoku() ,solver.dim)
 
-        self.root = customtkinter.CTk(fg_color = "whitesmoke")
+
+    def setup_gui(self):
+        self.root = customtkinter.CTk(fg_color="whitesmoke")
 
         self.root.title("Sudoku")
-        self.root.geometry("860x600")
-        self.counter = 0
-        self.running = False
-        self.time_label = customtkinter.CTkLabel(self.root, text="00:00", font=("arial", 38))
-        self.time_label.grid(row=2 , column = 25 )
-        self.counter_label = customtkinter.CTkLabel(self.root, text="0", font=("arial", 38))
-        self.counter_label.grid(row=4 , column = 25 )
-        self.create_entries()
-
-        self.menu_bar()
-        self.start_timer()
-
-
-        self.root.mainloop()
-
-    def create_entries(self):
+        self.root.geometry("860x860")
         self.matrix_entries = {}
         self.entries_index = {}
+        self.counter = 0
+        self.create_entries()
+        self.create_buttons()
+
+        self.running = False
+
+        self.create_labels()
+        self.start_timer()
+        self.menu_bar()
+        self.root.mainloop()
+
+    def color_entry(self, row, col, entry, state='disabled', color='skyblue'):
+
+        if solver.sudoku[row, col] != 0:
+            entry.insert(0, str(solver.sudoku[row, col]))
+            entry.configure(state=state, fg_color=color)
+        else:
+            entry.configure(fg_color='white')
 
 
-        subgrid_colors = ['lightskyblue1', 'gray']  # Define colors for the subgrids
-        for row in range(solver.dim):
-            for col in range(solver.dim):
-                subgrid_row_start = (row // solver.grid_dim) * solver.grid_dim
-                subgrid_col_start = (col // solver.grid_dim) * solver.grid_dim
-                color_index = (subgrid_row_start // solver.grid_dim + subgrid_col_start // solver.grid_dim) % 2
+    def create_entries(self , entries_config = None ):
+        dim = solver.dim
+        grid_dim = solver.grid_dim
+        subgrid_colors = ['lightskyblue', 'navyblue']
+
+        for row in range(dim):
+            for col in range(dim):
+                subgrid_row_start = (row // grid_dim) * grid_dim
+                subgrid_col_start = (col // grid_dim) * grid_dim
+                color_index = (subgrid_row_start // grid_dim + subgrid_col_start // grid_dim) % 2
 
                 entry = customtkinter.CTkEntry(
                     self.root,
@@ -75,38 +90,59 @@ class Sudoku_GUI:
                     corner_radius=4
                 )
 
-                if solver.sudoku[row, col] != 0:
-                    entry.insert(0, str(solver.sudoku[row, col]))
-                    entry.configure(state='disabled', height=50, width=55, border_width=2, fg_color='lightblue', corner_radius=4)
-                else:
-                    entry.configure(bg_color='white' , fg_color = 'white')  # Set background color for editable entries
+                if entries_config :
+                    entry_engifuration = entries_config[(row, col)]
+                    state , color = entry_engifuration[0] , entry_engifuration[1]
+                    self.color_entry(row, col, entry, state, color)
 
+                else:
+                    self.color_entry(row, col, entry)
+
+
+                entry.bind("<KeyRelease>", partial(self.on_key_release, widget=entry))
+                entry.bind("<FocusIn>", partial(self.on_focus_in, widget=entry))
+                entry.bind("<FocusOut>", partial(self.on_focus_out, widget=entry))
+
+                entry.place(x = 100 + col*54 , y = 50 +row*52 )
                 self.matrix_entries[entry] = (row, col)
                 self.entries_index[row, col] = entry
 
 
-                entry.grid(row=row+4, column=col+4, padx=0, pady=0)  # Adjust padx and pady
+    def create_labels(self):
+        self.time_label = customtkinter.CTkLabel(self.root, text="00:00", font=("arial", 38))
+        self.time_label.place(x=200 + solver.dim * 52 , y = 100 )
 
-                # Use partial to pass the widget to the event handler
-                entry.bind("<KeyRelease>", partial(self.on_key_release, widget=entry))
+        self.counter_label = customtkinter.CTkLabel(self.root, text="0", font=("arial", 38))
+        self.counter_label.place(x=200 + solver.dim *56 , y=200 )
 
 
-                entry.bind("<FocusIn>", partial(self.on_focus_in, widget=entry))
 
-                entry.bind("<FocusOut>", partial(self.on_focus_out, widget=entry))
-        # Create buttons outside the nested loops
-        solve_button = customtkinter.CTkButton(self.root, text="Solve", command=self.solve, height=35, width=100, fg_color="green")
-        clean_button = customtkinter.CTkButton(self.root, text="Clean", command=self.clean_matrix, height=35, width=100, fg_color='red')
-        sudoku_create = customtkinter.CTkButton(self.root, text="New Game", command=self.create_game, height=35, width=100)
 
-        solve_button.grid(row=solver.dim + 30, column=2, columnspan=solver.dim // 2)
-        clean_button.grid(row=solver.dim + 30, column=5, columnspan=solver.dim // 2)
-        sudoku_create.grid(row=solver.dim + 30, column=8, columnspan=solver.dim // 2)
+
+
+    def create_buttons(self):
+        dim = solver.dim
+        button_properties = [
+            ("Solve", self.solve, "green"),
+            ("Clean", self.clean_matrix, "red"),
+            ("New Game", self.create_game , 'lightblue3')
+        ]
+
+        for text, command, color in button_properties:
+            button = customtkinter.CTkButton(self.root, text=text, command=command, height=35, width=100,
+                                                 fg_color=color)
+            if text == "Solve":
+                button.place(x = solver.dim*12 , y=50 + solver.dim * 53)
+            elif text == "Clean":
+                button.place(x = solver.dim * 32 , y=50 + solver.dim * 53)
+            elif text == "New Game":
+                button.place(x = solver.dim *52, y=50 + solver.dim * 53)
+
+
 
 
 
     def menu_bar(self ):
-
 
         # Create a File menu
         self.menu = Menu(self.root)
@@ -118,129 +154,325 @@ class Sudoku_GUI:
         file_menu.add_command(label="Open", command=self.open_game)
         file_menu.add_command(label="Save", command=self.save_game)
         file_menu.add_command(label="Exit", command=self.root.destroy)
-
-
-
     def open_game(self):
+        """
+        Open a saved Sudoku game from a file and initialize the game board accordingly.
+        """
+        # Hide the main window while the file dialog is open
         self.root.withdraw()
 
-        new_sudoku= open(filedialog.askopenfilename(),'r')
+        # Ask the user to select a file to open
+        file_path = filedialog.askopenfilename(defaultextension=".txt")
+
+        # Check if the user canceled the file dialog
+        if not file_path:
+            print("Open operation canceled.")
+            self.root.deiconify()  # Restore the main window
+            return
+
+        try:
+            # Read the content of the selected file
+            with open(file_path, 'r') as new_sudoku:
+                # Parse each line in the file
+                for line in new_sudoku:
+                    if line.startswith('game dim '):
+                        # Extract the dimension of the Sudoku grid
+                        dim = int(line[len('game dim '):].strip())
+                        sudoku = np.zeros((dim, dim), dtype=int)
+                        entries_config = {}
+
+                    elif line.startswith('time '):
+                        # Extract the total seconds
+                        self.total_seconds = int(line[len('time '):].strip())
+                    elif line.startswith('step count '):
+                        # Extract the step count
+                        self.counter = int(line[len('step count '):].strip())
+
+                    elif line.startswith('difficulty '):
+                        # Extract the step count
+                         difficulty = int(line[len('difficulty '):].strip())
+
+                    else:
+                        # Parse the line for entry values and configurations
+                        pattern = re.compile(r'(\d+) ,(\d+),(\d+) ,(\d+), color (\w+) , state (\w+)')
+                        match = pattern.match(line)
+                        print(match)
+                        if match:
+                            value = int(match.group(1))
+                            row = int(match.group(2))
+                            col = int(match.group(3))
+                            counter = int(match.group(4))
+                            color = match.group(5)
+                            state = match.group(6)
+
+                            # Update Sudoku grid with parsed values
+                            sudoku[row, col] = value
+
+                            # Store entry configurations for later creation
+                            entries_config[(row, col)] = {'state': state, 'color': color}
 
 
-        sudoku = np.zeros((solver.dim ,solver.dim)).astype(int).reshape(solver.dim , solver.dim)
 
-        for grid_values in new_sudoku:
+                # Set settings to the Solver Class
+                self.initialize_solver(dim, difficulty)
 
-            if 'game dim' in grid_values:
-                dim = int(grid_values[len('game dim '):])
+                # Insert Sudoku grid into the solver
+                solver.grid_insert(sudoku, dim)
 
-            elif 'time' in grid_values:
-                self.total_seconds = int(grid_values[len('time'):])
+                # Create the graphical user interface
 
-            elif 'step count ' in grid_values:
-                self.counter = int(grid_values[len('step count '):])
+                self.setup_gui()
 
 
-            else:
-                numbers = re.findall(r'\d+', grid_values)
-
-                row , col , values = int(numbers[0]) , int(numbers[1]) , int(numbers[2])
-
-                sudoku[row , col] = values
-
-        solver.grid_insert(sudoku,dim)
 
 
-        self.create_entries()
-        self.root.deiconify()
+
+
+
+        except Exception as e:
+            print(f"Error opening file: {e}")
+            return
+
+        print("Open operation completed.")
+
+    def update_entry(self, row, col, value, color, entry_state):
+        """
+        Update the specified Entry widget with the provided value, color, and state.
+
+        Parameters:
+        - row: Row index of the Entry widget in the grid
+        - col: Column index of the Entry widget in the grid
+        - value: Value to be inserted into the Entry widget
+        - color: Desired foreground color for the Entry widget
+        - entry_state: Desired state ('normal', 'disabled', etc.) for the Entry widget
+        """
+        # Retrieve the Entry widget from self.entries_index using (row, col) as key
+        entry = self.entries_index[(row, col)]
+
+
+        if entry:
+            # Clear the current content of the Entry widget and insert the new value
+            entry.delete(0, END)
+            entry.insert(0, str(value))
+
+            # Configure the Entry widget with the specified foreground color and state
+            entry.configure(fg_color=color, state=entry_state)
+        else:
+            print(f"No Entry widget found at position ({row}, {col}) in self.entries_index.")
+
 
 
     def save_game(self):
-        self.root.withdraw()
+        """
+        Save the current state of the game to a file.
+        """
+        try:
+            # Open a file dialog to get the save file path
+            file_path = filedialog.asksaveasfilename(defaultextension=".txt")
+            print(file_path)
+            # Check if the user canceled the file dialog
+            if not file_path:
+                print("Save operation canceled.")
+                return
 
-        save_current_game = open(filedialog.asksaveasfilename(),'w')
-
-        save_current_game.write('game dim ' + str(solver.dim)+'\n')
-        save_current_game.write('time ' + str(self.total_seconds) +'\n')
-        save_current_game.write('step count ' + str(self.counter)+'\n')
-
-        for index in solver.domains:
-            if len(solver.domains[index]) == 1 :
-                save_current_game.write(f"{index} : {str(solver.domains[index].pop())}\n")
+            with open(file_path, 'w') as save_current_game:
+                # Write header or any other information
+                save_current_game.write(f"game dim {solver.dim}\n")
+                save_current_game.write(f"time {self.total_seconds}\n")
+                save_current_game.write(f"step count {self.counter}\n")
+                save_current_game.write(f"difficulty {solver.difficulty}\n")
 
 
-        save_current_game.close()
+                # Iterate through all widgets in the grid
+
+                for (row, col) in self.matrix_entries.values():
+                    widget_info = self.entries_index[(row,col)]
+                    value = widget_info.get()  # Get text value of the widget
+                    fg_color = widget_info.cget('fg_color')  # Get foreground color
+                    entry_state = widget_info.cget('state')
+
+                        # Convert value to integer if possible
+
+                    try:
+                        value = int(value)
+
+                    except ValueError:
+
+                        value = 0
+                    # Write widget information to the file
+                    save_current_game.write(f"{value}, {row}, {col}, color {fg_color}, state {entry_state}\n")
 
 
+            print("Save operation completed.")
 
-        self.root.deiconify()
+        except Exception as e:
+            print(f"Error saving file: {e}")
+
 
 
 
 
     def solve(self):
+        """
+        Solve the Sudoku puzzle and display the solution (if found).
+
+        Steps:
+        1. Check if the game has ended.
+        2. Insert initial Sudoku grid.
+        3. Attempt to find a solution using the solver.
+        4. If a solution exists, display the first solution found.
+        5. Display the number of solutions found.
+        6. Insert the solution values into the GUI.
+        """
+        # Step 1: Check if the game has ended (assumed method self.game_end exists)
         self.game_end()
-        solver.grid_insert(solver.create_sudoku_matrix(solver.domains) ,solver.dim)
 
+        # Step 2: Insert the initial Sudoku grid into the solver
+        solver.grid_insert(solver.create_sudoku_matrix(solver.domains), solver.dim)
 
-        exist_solution = solver.Solver()
+        # Step 3: Attempt to find a solution using the solver
+        exist_solution = solver.Solver()  # Assuming this checks if a solution exists
+
+        # Step 4: If a solution exists, display the first solution found
         if exist_solution:
             num_solutions = len(solver.solved_sudoku)
             self.solution = solver.create_sudoku_matrix(solver.solved_sudoku.pop(0))
 
+            # Step 5: Display the number of solutions found
+            self.solution_count = customtkinter.CTkLabel(self.root, text="Solutions Found: " + str(num_solutions),
+                                                         font=("Arial", 20))
+            self.solution_count.place(x=(100 + solver.dim * 52) // 2, y=10)
 
-            self.solution_count = customtkinter.CTkLabel(self.root, text="Solutions Found: " + str(num_solutions), font=("Arial", 20))
-            self.solution_count.grid(row=7 , column = 25 )
-
-        print(exist_solution)
-        self.insert_values(0,0,exist_solution)
+        # Step 6: Insert the solution values into the GUI
+        self.insert_values(0, 0, exist_solution)
 
 
 
-    def insert_values(self , row , col,exist_solution):
+    def insert_values(self, row, col, exist_solution):
+        """
+        Insert values into the entry widgets based on the provided solution.
+
+        Parameters:
+        - row: Current row index
+        - col: Current column index
+        - exist_solution: Boolean indicating if a solution exists
+        """
         if row < solver.dim:
             if col < solver.dim:
                 if exist_solution:
-                    self.entries_index[row,col].delete(0, END)
-                    self.entries_index[row,col].insert(0, str(self.solution[row][col]))
-                    self.entries_index[row , col].configure(state = 'disabled')
-                else :
-                    if self.entries_index[row,col].cget('state') != 'disabled':
-                        self.entries_index[row,col].configure(fg_color="lightsalmon")
+                    # If a solution exists, insert the solution value into the entry
+                    entry_widget = self.entries_index[row, col]
+                    entry_widget.delete(0, END)
+                    entry_widget.insert(0, str(self.solution[row,col]))
+                    entry_widget.configure(state='disabled')
+                else:
+                    # If no solution exists, change text color to indicate no solution
+                    entry_widget = self.entries_index[row, col]
+                    if entry_widget.cget('state') != 'disabled':
+                        entry_widget.configure(fg_color='lightsalmon')
 
-                self.root.after(35, self.insert_values, row, col + 1 , exist_solution)
+                # Schedule the next insert_values call for the next column
+                self.root.after(35, self.insert_values, row, col + 1, exist_solution)
             else:
-                self.root.after(75, self.insert_values, row + 1, 0 , exist_solution)
+                # Schedule the next insert_values call for the next row
+                self.root.after(75, self.insert_values, row + 1, 0, exist_solution)
+
+
+
 
     def on_focus_in(self, event, widget):
-        index = self.matrix_entries[widget]
-        row, col = index[0], index[1]
-        related_cells = solver.related_cells[(row, col)]
+        """
+        Handles the event when an entry widget gains focus.
+
+            Args:
+            - event: The event object associated with the focus in event.
+            - widget: The entry widget that gained focus.
+        """
+
+        index = self.matrix_entries[widget]  # Get the index (row, column) of the widget
+        key = (index[0], index[1])
+
+        self.change_color(key)
+
+
+
+    def change_color(self, index):
+        """
+        Change foreground and background color of an entry widget and related cells.
+
+        Args:
+        - entry: The entry widget to change color.
+
+        Changes the foreground to 'lightblue' and background to 'gray' of the given entry.
+        Iterates through related cells and changes color if their current foreground color is 'white'.
+        """
+
+
+        # Change color of the current entry
+        def change(entry):
+            entry.configure(fg_color='lightblue', bg_color='gray')
+
+        related_cells = solver.related_cells[index]
+        # Get related cells for the current cell from solver's related_cells
+
+        # Iterate through related cells and change color if current color is 'white'
         for cell in related_cells:
             cell_row, cell_col = cell
-            entry = self.entries_index[cell_row, cell_col]
-            if entry.cget('fg_color') == 'white':
-                entry.configure(fg_color='skyblue' ,bg_color ='gray')
+            related_entry = self.entries_index[cell_row, cell_col]
+
+            if related_entry.cget('fg_color') == 'white':
+                # Use lambda to pass the current related_entry to the change_color function
+                self.root.after(40, lambda e=related_entry: change(e))
 
     def on_focus_out(self, event, widget):
+        """
+        Handles the event when an entry widget loses focus.
+
+        Args:
+        - event: The event object associated with the focus out event.
+        - widget: The entry widget that lost focus.
+
+        Resets the color of related entry widgets to 'white' on 'white' background
+        if their current foreground color is 'lightblue'.
+        """
+        # Get the index (row, column) of the widget from matrix_entries
         index = self.matrix_entries[widget]
         row, col = index[0], index[1]
+
+        # Get related cells for the current cell from solver's related_cells
         related_cells = solver.related_cells[(row, col)]
+
+        # Iterate through related cells and reset color if current color is 'lightblue'
         for cell in related_cells:
             cell_row, cell_col = cell
             entry = self.entries_index[cell_row, cell_col]
-            if entry.cget('fg_color') == 'skyblue':
-                entry.configure(fg_color='white' , bg_color = 'white')
 
-    def on_key_release(self, event,widget):
+            if entry.cget('fg_color') == 'lightblue':
+                entry.configure(fg_color='white', bg_color='white')
+
+    def on_key_release(self, event, widget):
+        """
+        Handles the event when a key is released in an entry widget.
+
+        Args:
+        - event: The event object associated with the key release event.
+        - widget: The entry widget where the key was released.
+
+        Processes the entry, validates it, updates solver and UI accordingly,
+        handles repeated entries, and updates the counter if necessary.
+        """
         entry = widget
-        entry_value = event.widget.get()
+        entry_value = entry.get()
 
+        # Get the index (row, column) of the widget from matrix_entries
         index = self.matrix_entries[widget]
+
+        # If entry value is empty, remove element and reset color to 'white'
         if len(entry_value) == 0:
             self.remove_element(index)
-            entry.configure(fg_color = 'white')
+            entry.configure(fg_color='white')
             return
+
         # Validate entry
         if not self.is_valid_entry(entry_value):
             self.handle_invalid_entry(entry, index)
@@ -249,16 +481,15 @@ class Sudoku_GUI:
         # Check for repeated entry
         repeated = self.is_repeated_entry(index, entry_value)
 
-        # Update solver and UI
+        # Update solver and UI based on the entry value
         if self.update_solver(index, entry_value):
-            entry.configure(fg_color = "palegreen")
+            entry.configure(fg_color="palegreen")  # Valid entry color
         else:
-            self.handle_solver_failure(entry, index, entry_value)
+            self.handle_solver_failure(entry, index, entry_value)  # Failed entry color
 
-        # Update counter if entry is not repeated
+        # Increment counter if entry is not repeated
         if not repeated:
             self.increment_counter()
-
 
     def is_valid_entry(self, entry_value):
         return entry_value.isdigit() and 1 <= int(entry_value) <= solver.dim
@@ -291,51 +522,103 @@ class Sudoku_GUI:
 
 
 
-
     def remove_element(self, index):
-        solver.domains[index]  =  set(range(1,solver.dim + 1))
+            # Reset the domain of the given index to contain all possible values (1 to dim)
+        solver.domains[index] = set(range(1, solver.dim + 1))
 
+            # Perform sudoku reduction to update the domains of all cells
         solver.sudoku_reduction()
 
+            # Update the length_values for the given index with the new length of its domain
         solver.length_values[index] = len(solver.domains[index])
 
-
+    # Example usage:
+    # app = SudokuApp(dim=9, difficulty='easy')
 
     def clean_matrix(self):
+        # Initialize a zero matrix of the appropriate dimensions
         self.matrix = np.zeros((solver.dim, solver.dim))
+
+        # Iterate over each cell in the matrix
         for row in range(solver.dim):
             for col in range(solver.dim):
-                self.entries_index[row, col].configure(state='normal')  # Ensure the entry is writable
-                self.entries_index[row, col].configure(fg_color="white")
-                self.entries_index[row, col].delete(0, END)  # Clear the entry
+                # Ensure the entry is writable
+                self.entries_index[row, col].configure(state='normal')
 
-        solver.grid_insert(self.matrix , solver.dim)
+                # Reset the foreground color to white
+                self.entries_index[row, col].configure(fg_color="white")
+
+                # Clear the content of the entry widget
+                self.entries_index[row, col].delete(0, END)
+
+        # Insert the zero matrix into the solver's grid
+        solver.grid_insert(self.matrix, solver.dim)
+
 
     def start_timer(self):
-        time_difficulty_relation = {(65, 70): 20, (75, 80): 10, (85, 90): 5}
+        # Define the time difficulty relation based on dimension and difficulty
+        time_difficulty_relation = {
+            (9, (65, 70)): 30, (9, (75, 80)): 20, (9, (85, 90)): 15,
+            (16, (65, 70)): 50, (16, (75, 80)): 40, (16, (85, 90)): 35
+        }
 
-        self.total_seconds = 60 * time_difficulty_relation[solver.difficulty_category]
+        # Determine the key for the current dimension and difficulty category
+        difficulty_key = (solver.dim, solver.difficulty_category)
+
+        # Initialize the total seconds for the timer
+        self.total_seconds = 60 * time_difficulty_relation[difficulty_key]
+
+        # Start the timer if not already running
+        if not self.running:
+            self.running = True
+            self.update_timer()
+
+    def start_timer(self):
+        # Define the time difficulty relation based on dimension and difficulty
+        time_difficulty_relation = {
+            (9, (65, 70)): 30, (9, (75, 80)): 20, (9, (85, 90)): 15,
+            (16, (65, 70)): 50, (16, (75, 80)): 40, (16, (85, 90)): 35
+        }
+
+        # Determine the key for the current dimension and difficulty category
+        difficulty_key = (solver.dim, solver.difficulty_category)
+
+        # Initialize the total seconds for the timer
+        self.total_seconds = 60 * time_difficulty_relation[difficulty_key]
+
+        # Start the timer if not already running
         if not self.running:
             self.running = True
             self.update_timer()
 
     def update_timer(self):
+        # Check if there are seconds left in the timer
+        if self.total_seconds > 0:
+            # Decrement the total seconds by 1
+            self.total_seconds -= 1
 
-        if self.total_seconds > 0 :
-            self.total_seconds -=1
-            self.time_label.configure(text = self.format_time())
-            self.root.after(1000 , self.update_timer)
+            # Update the timer label with the new time
+            self.time_label.configure(text=self.format_time())
 
+            # Schedule the update_timer method to be called again after 1000 milliseconds (1 second)
+            self.root.after(1000, self.update_timer)
         else:
+            # If the timer has run out, call the game_end method
             self.game_end()
 
     def game_end(self):
+        # Set the total seconds to 0 (in case it wasn't already exactly 0)
         self.total_seconds = 0
-        self.time_label.configure(text = "Game Over")
-    def format_time(self):
-        minutes, seconds = divmod(self.total_seconds, 60)
-        return f"{minutes:02}:{seconds:02}"
 
+        # Update the timer label to indicate that the game is over
+        self.time_label.configure(text="Game Over")
+
+    def format_time(self):
+        # Calculate the number of minutes and seconds from total_seconds
+        minutes, seconds = divmod(self.total_seconds, 60)
+
+        # Return the time formatted as MM:SS
+        return f"{minutes:02}:{seconds:02}"
     def create_game(self):
         self.root.destroy()
         Start_SudokuGUI()
@@ -350,38 +633,58 @@ class Start_SudokuGUI:
 
     def setup_gui(self):
         self.start_widget = customtkinter.CTk()
+
         self.start_widget.title("Select Sudoku Dimension")
+
         self.start_widget.geometry("480x240")
 
         puzzle_dims = ["16", "9"]
+
         self.difficulties = ["Easy", "Medium", "Hard"]
+
         self.selected_size = StringVar(value=puzzle_dims[0])
+
         self.selected_difficulty = StringVar(value=self.difficulties[0])
 
         # Configure the grid layout
         self.start_widget.columnconfigure(0, weight=1)
+
         self.start_widget.columnconfigure(1, weight=1)
 
+
         for index, option in enumerate(puzzle_dims):
+
             dim = customtkinter.CTkRadioButton(self.start_widget, text=f"{option}x{option}", variable=self.selected_size, value=option)
+
             dim.grid(row=index, column=0, padx=10, pady=5, sticky="w")
 
         for index, option in enumerate(self.difficulties):
+
             diff = customtkinter.CTkRadioButton(self.start_widget, text=option, variable=self.selected_difficulty, value=option.lower())
+
             diff.grid(row=index, column=1, padx=30, pady=20, sticky="w")
 
         solve_button = customtkinter.CTkButton(self.start_widget, text="Start", command=self.get_size)
+
         solve_button.grid(row=max(len(puzzle_dims), len(self.difficulties)), column=0, columnspan=2, padx=40, pady=20)
 
         self.start_widget.mainloop()
+
+
+
     def get_size(self):
+
         size = self.selected_size.get()
+
         difficulty_pointer = difficulty_ranges = {
                                     "easy": (65, 70),
                                     "medium": (75, 80),
                                     "hard": (85, 90)
                                 }
+
+
         difficulty = difficulty_pointer[self.selected_difficulty.get().lower()]
+
         remove_elements = int(random.randint(difficulty[0], difficulty[1]))
 
         solver.difficulty_category = difficulty
