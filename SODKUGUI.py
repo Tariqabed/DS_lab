@@ -1,84 +1,138 @@
-from generate_sudoku import SolveAC , GenerateSudoku
+from sudoku_better_version_ import SudokuSolver
 import numpy as np
-import sympy as sp
-import random
-from tkinter import *
-import time
-import datetime
-from tkinter import *
-import math
-import os
 import multiprocessing
-from multiprocessing import Pool
-import copy
-import time
-import re
+import random
+from tkinter import filedialog, messagebox, Menu,StringVar
+import numpy as np
 import customtkinter
-from tkinter import filedialog
-
 from functools import partial
+import re
+import time
+from tkinter import END
+from tkinter import filedialog, messagebox, Menu
+import pygame
 
-solver = SolveAC()
-
-GenerateSudoku = GenerateSudoku()
 
 
+solver =SudokuSolver()
 
 class Sudoku_GUI:
     def __init__(self, dim, difficulty):
-            self.initialize_solver(dim, difficulty)
-            solver.grid_insert(solver.create_sudoku(), solver.dim)
-            self.setup_gui()
+        # Initialize the Sudoku solver with specified dimensions and difficulty level
+        self.initialize_solver(dim, difficulty)
+        # Generate a Sudoku grid and insert it into the solver's grid
+        solver.grid_insert(solver.create_sudoku(), solver.dim)
+        # Set up the graphical user interface (GUI) for the Sudoku game
+        self.setup_gui()
 
     def initialize_solver(self, dim, difficulty):
-        solver.domains = {}
-        solver.related_cells = {}
-        solver.length_values = {}
-        solver.solution = list()
+        """
+        Initializes the Sudoku solver with dimensions and difficulty level.
 
-        solver.dim = int(dim)
-        solver.grid_dim = np.sqrt(int(dim))
-        solver.difficulty = difficulty
+        Args:
+        - dim (int): Dimension of the Sudoku grid (e.g., 9 for a 9x9 grid).
+        - difficulty (str): Difficulty level of the Sudoku puzzle.
 
+        Initializes the following attributes of the solver:
+        - domains: Dictionary to store domain values for each cell.
+        - related_cells: Dictionary to store related cells for each cell.
+        - length_values: Dictionary to store length values.
+        - solution: List to store the solution steps.
 
-    def setup_gui(self):
-        self.root = customtkinter.CTk(fg_color="whitesmoke")
+        Sets the dimensions, grid dimensions, and difficulty level for the solver.
+        """
+        solver.domains = {}  # Initialize dictionary to store domain values for each cell
+        solver.related_cells = {}  # Initialize dictionary to store related cells for each cell
+        solver.length_values = {}  # Initialize dictionary to store length values
+        solver.solution = []  # Initialize list to store solution steps
 
-        self.root.title("Sudoku")
-        self.root.geometry("860x860")
-        self.matrix_entries = {}
-        self.entries_index = {}
-        self.counter = 0
-        self.create_entries()
-        self.create_buttons()
+        solver.dim = int(dim)  # Set dimension of the Sudoku grid
+        solver.grid_dim = np.sqrt(int(dim))  # Calculate grid dimension based on square root of dim
+        solver.difficulty = difficulty  # Set the difficulty level of the Sudoku puzzle
 
-        self.running = False
+    def setup_gui(self, entries_config=None):
+        """
+        Sets up the GUI for the Sudoku application.
 
-        self.create_labels()
-        self.start_timer()
-        self.menu_bar()
-        self.root.mainloop()
+        Args:
+        - entries_config (dict): Configuration for individual Sudoku grid entries.
 
-    def color_entry(self, row, col, entry, state='disabled', color='skyblue'):
+        Initializes the main window and sets up various components:
+        - Creates the root window using customtkinter.CTk with a white smoke foreground color.
+        - Sets the window title and size.
+        - Initializes dictionaries to store CTkEntry widgets and their indices.
+        - Creates Sudoku grid entries based on entries_config (if provided).
+        - Creates buttons for user interactions.
+        - Initializes game-related attributes like counter and timer.
+        - Sets up labels for displaying game status.
+        - Configures the menu bar for additional functionalities.
+        - Starts the main event loop (mainloop()) to run the GUI application.
+        """
+        self.root = customtkinter.CTk(fg_color="whitesmoke")  # Create main window with white smoke foreground color
+        self.root.title("Sudoku")  # Set window title
 
-        if solver.sudoku[row, col] != 0:
-            entry.insert(0, str(solver.sudoku[row, col]))
-            entry.configure(state=state, fg_color=color)
+        window_size = "1920x1080" if solver.dim == 16 else "860x720"
+        self.root.geometry(window_size)
+
+        self.matrix_entries = {}  # Dictionary to store CTkEntry widgets mapped to their positions
+        self.entries_index = {}  # Dictionary to store CTkEntry widgets mapped to (row, col) indices
+        self.counter = 0  # Initialize step counter for the game
+
+        self.create_entries(entries_config)  # Create Sudoku grid entries based on configuration (if provided)
+        self.create_buttons()  # Create buttons for user interactions
+
+        self.running = False  # Flag to indicate if the game is running or paused
+
+        self.create_labels()  # Create labels for displaying game status
+        self.start_timer()  # Start the timer for tracking game duration
+        self.menu_bar()  # Configure the menu bar for additional functionalities
+
+        self.root.mainloop()  # Start the main event loop to run the GUI application
+
+    def configure_entry(self, row, col, entry, state='disabled', color='skyblue'):
+        """
+        Configures a CTkEntry widget based on Sudoku grid value.
+
+        Args:
+        - row (int): Row index in the Sudoku grid.
+        - col (int): Column index in the Sudoku grid.
+        - entry (CTkEntry): Entry widget to configure.
+        - state (str): State of the entry ('disabled' or 'normal').
+        - color (str): Foreground color of the entry ('skyblue' or any valid color).
+
+        Sets the appearance of the entry widget based on the Sudoku grid value:
+        - Inserts the Sudoku value and applies the specified state and color if the value is not zero.
+        - Sets the foreground color to 'white' if the Sudoku value is zero.
+        """
+        sudoku_value = solver.sudoku[row][col]
+
+        if sudoku_value != 0:
+            entry.insert(0, str(sudoku_value))  # Insert Sudoku value if not zero
+            entry.configure(state=state, fg_color=color)  # Apply state and color
         else:
-            entry.configure(fg_color='white')
+            entry.configure(fg_color='white')  # Set foreground color to white for zero value
 
 
-    def create_entries(self , entries_config = None ):
+    def create_entries(self, entries_config=None):
+        """
+        Create CTkEntry widgets for the Sudoku grid.
+
+        Args:
+        - entries_config (dict): Optional dictionary with configurations for specific entries.
+                                 Keys are (row, col) tuples, values are [state, color].
+        """
         dim = solver.dim
         grid_dim = solver.grid_dim
         subgrid_colors = ['lightskyblue', 'navyblue']
 
         for row in range(dim):
             for col in range(dim):
+                # Determine subgrid color based on row and column indices
                 subgrid_row_start = (row // grid_dim) * grid_dim
                 subgrid_col_start = (col // grid_dim) * grid_dim
                 color_index = (subgrid_row_start // grid_dim + subgrid_col_start // grid_dim) % 2
 
+                # Create CTkEntry widget with specified properties
                 entry = customtkinter.CTkEntry(
                     self.root,
                     height=50,
@@ -90,22 +144,25 @@ class Sudoku_GUI:
                     corner_radius=4
                 )
 
-                if entries_config :
-                    entry_engifuration = entries_config[(row, col)]
-                    state , color = entry_engifuration[0] , entry_engifuration[1]
-                    self.color_entry(row, col, entry, state, color)
-
+                # Apply configurations from entries_config if provided
+                if entries_config and (row, col) in entries_config:
+                    state, color = entries_config[(row, col)]
+                    self.configure_entry(row, col, entry, state, color)
                 else:
-                    self.color_entry(row, col, entry)
+                    self.configure_entry(row , col , entry)
 
-
+                # Bind events to the entry widget
                 entry.bind("<KeyRelease>", partial(self.on_key_release, widget=entry))
                 entry.bind("<FocusIn>", partial(self.on_focus_in, widget=entry))
                 entry.bind("<FocusOut>", partial(self.on_focus_out, widget=entry))
 
-                entry.place(x = 100 + col*54 , y = 50 +row*52 )
+                # Position the entry widget in the grid
+                entry.place(x=100 + col * 54, y=50 + row * 52)
+
+                # Store mappings of entry widget to (row, col) and (row, col) to entry widget
                 self.matrix_entries[entry] = (row, col)
-                self.entries_index[row, col] = entry
+                self.entries_index[(row, col)] = entry
+
 
 
     def create_labels(self):
@@ -115,32 +172,28 @@ class Sudoku_GUI:
         self.counter_label = customtkinter.CTkLabel(self.root, text="0", font=("arial", 38))
         self.counter_label.place(x=200 + solver.dim *56 , y=200 )
 
-
-
-
-
-
     def create_buttons(self):
-        dim = solver.dim
+        dim = solver.dim  # Assuming solver.dim is defined and accessible here
+        # Define button properties in a list for easier management
         button_properties = [
-            ("Solve", self.solve, "green"),
-            ("Clean", self.clean_matrix, "red"),
-            ("New Game", self.create_game , 'lightblue3')
+            ("Solve", self.solve, "green"),  # Button to solve the game
+            ("Clean", self.clean_matrix, "red"),  # Button to clean/reset the matrix
+            ("New Game", self.create_game, 'lightblue3')  # Button to create a new game
         ]
 
+        # Loop through each button property to create and place the buttons
         for text, command, color in button_properties:
+            # Create a button with custom properties
             button = customtkinter.CTkButton(self.root, text=text, command=command, height=35, width=100,
-                                                 fg_color=color)
+                                             fg_color=color)
+
+            # Place buttons based on their text label
             if text == "Solve":
-                button.place(x = solver.dim*12 , y=50 + solver.dim * 53)
+                button.place(x=solver.dim * 12, y=50 + solver.dim * 53)
             elif text == "Clean":
-                button.place(x = solver.dim * 32 , y=50 + solver.dim * 53)
+                button.place(x=solver.dim * 32, y=50 + solver.dim * 53)
             elif text == "New Game":
-                button.place(x = solver.dim *52, y=50 + solver.dim * 53)
-
-
-
-
+                button.place(x=solver.dim * 52, y=50 + solver.dim * 53)
 
     def menu_bar(self ):
 
@@ -194,24 +247,21 @@ class Sudoku_GUI:
 
                     else:
                         # Parse the line for entry values and configurations
-                        pattern = re.compile(r'(\d+) ,(\d+),(\d+) ,(\d+), color (\w+) , state (\w+)')
-                        match = pattern.match(line)
-                        print(match)
+                        pattern = r'(\d+), (\d+), (\d+), color (\w+), state (\w+)'
+                        # Using re.match to apply the pattern to the string
+                        match = re.match(pattern, line)
                         if match:
                             value = int(match.group(1))
                             row = int(match.group(2))
                             col = int(match.group(3))
-                            counter = int(match.group(4))
-                            color = match.group(5)
-                            state = match.group(6)
+                            color_name = match.group(4)
+                            state = match.group(5)
 
                             # Update Sudoku grid with parsed values
                             sudoku[row, col] = value
 
                             # Store entry configurations for later creation
-                            entries_config[(row, col)] = {'state': state, 'color': color}
-
-
+                            entries_config[(row, col)] = [state, color_name]
 
                 # Set settings to the Solver Class
                 self.initialize_solver(dim, difficulty)
@@ -220,8 +270,7 @@ class Sudoku_GUI:
                 solver.grid_insert(sudoku, dim)
 
                 # Create the graphical user interface
-
-                self.setup_gui()
+                self.setup_gui(entries_config)
 
 
 
@@ -269,7 +318,6 @@ class Sudoku_GUI:
         try:
             # Open a file dialog to get the save file path
             file_path = filedialog.asksaveasfilename(defaultextension=".txt")
-            print(file_path)
             # Check if the user canceled the file dialog
             if not file_path:
                 print("Save operation canceled.")
@@ -332,18 +380,17 @@ class Sudoku_GUI:
 
         # Step 3: Attempt to find a solution using the solver
         exist_solution = solver.Solver()  # Assuming this checks if a solution exists
-
         # Step 4: If a solution exists, display the first solution found
         if exist_solution:
             num_solutions = len(solver.solved_sudoku)
             self.solution = solver.create_sudoku_matrix(solver.solved_sudoku.pop(0))
-
             # Step 5: Display the number of solutions found
             self.solution_count = customtkinter.CTkLabel(self.root, text="Solutions Found: " + str(num_solutions),
                                                          font=("Arial", 20))
             self.solution_count.place(x=(100 + solver.dim * 52) // 2, y=10)
 
         # Step 6: Insert the solution values into the GUI
+        print(exist_solution)
         self.insert_values(0, 0, exist_solution)
 
 
@@ -391,11 +438,15 @@ class Sudoku_GUI:
 
         index = self.matrix_entries[widget]  # Get the index (row, column) of the widget
         key = (index[0], index[1])
-
         self.change_color(key)
 
 
-
+    def play_sound(self):
+        # Play a sound if cursor on an entry
+        pygame.mixer.init()
+        music_file = "pop_sound.mp3"
+        pygame.mixer.music.load(music_file)
+        pygame.mixer.music.play(1)
     def change_color(self, index):
         """
         Change foreground and background color of an entry widget and related cells.
@@ -450,6 +501,7 @@ class Sudoku_GUI:
             if entry.cget('fg_color') == 'lightblue':
                 entry.configure(fg_color='white', bg_color='white')
 
+
     def on_key_release(self, event, widget):
         """
         Handles the event when a key is released in an entry widget.
@@ -483,6 +535,7 @@ class Sudoku_GUI:
 
         # Update solver and UI based on the entry value
         if self.update_solver(index, entry_value):
+            self.play_sound()
             entry.configure(fg_color="palegreen")  # Valid entry color
         else:
             self.handle_solver_failure(entry, index, entry_value)  # Failed entry color
@@ -510,7 +563,8 @@ class Sudoku_GUI:
 
     def update_solver(self, index, entry_value):
 
-        return solver.enter_element(solver.domains, solver.length_values, index[0], index[1], int(entry_value))
+        solver.domains[index] = {int(entry_value)}
+        return solver.is_valid(solver.domains, index[0], index[1], int(entry_value))
 
     def handle_solver_failure(self, entry, index, entry_value):
         solver.domains[index] = {int(entry_value)}
@@ -523,17 +577,9 @@ class Sudoku_GUI:
 
 
     def remove_element(self, index):
-            # Reset the domain of the given index to contain all possible values (1 to dim)
+        # Reset the domain of the given index to contain all possible values (1 to dim)
         solver.domains[index] = set(range(1, solver.dim + 1))
 
-            # Perform sudoku reduction to update the domains of all cells
-        solver.sudoku_reduction()
-
-            # Update the length_values for the given index with the new length of its domain
-        solver.length_values[index] = len(solver.domains[index])
-
-    # Example usage:
-    # app = SudokuApp(dim=9, difficulty='easy')
 
     def clean_matrix(self):
         # Initialize a zero matrix of the appropriate dimensions
@@ -552,14 +598,20 @@ class Sudoku_GUI:
                 self.entries_index[row, col].delete(0, END)
 
         # Insert the zero matrix into the solver's grid
+
+        # Set settings to the Solver Class
+        self.initialize_solver(solver.dim, solver.difficulty)
+
+        # Insert the zero's grid into the solver's grid
         solver.grid_insert(self.matrix, solver.dim)
 
 
+
     def start_timer(self):
         # Define the time difficulty relation based on dimension and difficulty
         time_difficulty_relation = {
-            (9, (65, 70)): 30, (9, (75, 80)): 20, (9, (85, 90)): 15,
-            (16, (65, 70)): 50, (16, (75, 80)): 40, (16, (85, 90)): 35
+            (9, (65, 69)): 25 , (9, (70, 74)):20 , (9, (75, 80)):15 ,
+            (16, (65, 69)): 40, (16, (70 ,74)):30 , (16, (75 ,80)):25
         }
 
         # Determine the key for the current dimension and difficulty category
@@ -573,23 +625,7 @@ class Sudoku_GUI:
             self.running = True
             self.update_timer()
 
-    def start_timer(self):
-        # Define the time difficulty relation based on dimension and difficulty
-        time_difficulty_relation = {
-            (9, (65, 70)): 30, (9, (75, 80)): 20, (9, (85, 90)): 15,
-            (16, (65, 70)): 50, (16, (75, 80)): 40, (16, (85, 90)): 35
-        }
 
-        # Determine the key for the current dimension and difficulty category
-        difficulty_key = (solver.dim, solver.difficulty_category)
-
-        # Initialize the total seconds for the timer
-        self.total_seconds = 60 * time_difficulty_relation[difficulty_key]
-
-        # Start the timer if not already running
-        if not self.running:
-            self.running = True
-            self.update_timer()
 
     def update_timer(self):
         # Check if there are seconds left in the timer
@@ -624,77 +660,72 @@ class Sudoku_GUI:
         Start_SudokuGUI()
 
 
-
-
-
 class Start_SudokuGUI:
     def __init__(self):
         self.setup_gui()
 
     def setup_gui(self):
+        # Create the main window for selecting Sudoku dimension and difficulty
         self.start_widget = customtkinter.CTk()
-
         self.start_widget.title("Select Sudoku Dimension")
-
         self.start_widget.geometry("480x240")
 
+        # Define available puzzle dimensions and difficulty levels
         puzzle_dims = ["16", "9"]
-
         self.difficulties = ["Easy", "Medium", "Hard"]
 
+        # Initialize variables to store selected size and difficulty
         self.selected_size = StringVar(value=puzzle_dims[0])
-
         self.selected_difficulty = StringVar(value=self.difficulties[0])
 
-        # Configure the grid layout
+        # Configure the grid layout for the window
         self.start_widget.columnconfigure(0, weight=1)
-
         self.start_widget.columnconfigure(1, weight=1)
 
-
+        # Create radio buttons for selecting puzzle dimensions
         for index, option in enumerate(puzzle_dims):
-
-            dim = customtkinter.CTkRadioButton(self.start_widget, text=f"{option}x{option}", variable=self.selected_size, value=option)
-
+            dim = customtkinter.CTkRadioButton(self.start_widget, text=f"{option}x{option}",
+                                               variable=self.selected_size, value=option)
             dim.grid(row=index, column=0, padx=10, pady=5, sticky="w")
 
+        # Create radio buttons for selecting difficulty levels
         for index, option in enumerate(self.difficulties):
-
-            diff = customtkinter.CTkRadioButton(self.start_widget, text=option, variable=self.selected_difficulty, value=option.lower())
-
+            diff = customtkinter.CTkRadioButton(self.start_widget, text=option,
+                                                variable=self.selected_difficulty, value=option.lower())
             diff.grid(row=index, column=1, padx=30, pady=20, sticky="w")
 
+        # Create a "Start" button to begin the Sudoku game
         solve_button = customtkinter.CTkButton(self.start_widget, text="Start", command=self.get_size)
-
         solve_button.grid(row=max(len(puzzle_dims), len(self.difficulties)), column=0, columnspan=2, padx=40, pady=20)
 
+        # Enter the main event loop to handle GUI events
         self.start_widget.mainloop()
 
-
-
     def get_size(self):
-
+        # Retrieve the selected puzzle size and difficulty level
         size = self.selected_size.get()
 
-        difficulty_pointer = difficulty_ranges = {
-                                    "easy": (65, 70),
-                                    "medium": (75, 80),
-                                    "hard": (85, 90)
-                                }
+        # Define difficulty ranges based on selected difficulty level
+        difficulty_ranges = {
+            "easy": (65, 69),
+            "medium": (70, 74),
+            "hard": (75,80)
+        }
 
+        # Retrieve the range of difficulty for the selected difficulty level
+        difficulty = difficulty_ranges[self.selected_difficulty.get().lower()]
 
-        difficulty = difficulty_pointer[self.selected_difficulty.get().lower()]
+        # Randomly determine the number of elements to remove based on difficulty
+        remove_elements = random.randint(difficulty[0], difficulty[1])
 
-        remove_elements = int(random.randint(difficulty[0], difficulty[1]))
-
+        # Set the difficulty category in the Sudoku solver
         solver.difficulty_category = difficulty
 
-        self.start_widget.destroy()  # Destroy the current window
-
+        # Destroy the current window after selecting size and difficulty
+        self.start_widget.destroy()
 
         # Assuming Sudoku_GUI is defined elsewhere and takes size and difficulty parameters
-        app = Sudoku_GUI(size, remove_elements)
+        app = Sudoku_GUI(size, remove_elements)  # Start the Sudoku game with selected size and difficulty
 
 if __name__ == "__main__":
     app = Start_SudokuGUI()
-
