@@ -78,7 +78,7 @@ class SudokuSolver:
                     value = self.sudoku[row, col]
                     self.domains[(row, col)] = {value}  # Set the domain of the cell to the preassigned value
 
-    def is_valid_sudoku(self, board):
+    def valid_sudoku(self, board):
         """
         Checks if a given Sudoku board is valid. A board is valid if no row, column, or sub-grid has duplicate values.
 
@@ -91,7 +91,7 @@ class SudokuSolver:
 
         def has_duplicates(group):
             """
-            Helper function to check if a group (row, column, or sub-grid) has duplicates.
+            Helper funzction to check if a group (row, column, or sub-grid) has duplicates.
 
             Args:
                 group (list): A list of integers representing a group of Sudoku cells.
@@ -387,7 +387,7 @@ class SudokuSolver:
             bool or dict: A solved Sudoku grid (dict) if a solution is found, False otherwise.
         """
         # Check if the current Sudoku grid is a valid initial state
-        if not self.is_valid_sudoku(self.create_sudoku_matrix(self.domains)):
+        if not self.valid_sudoku(self.create_sudoku_matrix(self.domains)):
             return False
 
         self.sudoku_reduction()
@@ -449,8 +449,6 @@ class SudokuSolver:
             results.append(result)
 
         return self.process_results(results ,pool)
-
-
     def process_results(self, results, pool ,solutions = None,max_solutions=1):
         """
         Process results obtained from parallel processing tasks until a desired number of solutions is found.
@@ -478,16 +476,17 @@ class SudokuSolver:
                     results.remove(result)  # Remove the processed result from the list
 
                     if len(self.solved_sudoku) >= max_solutions:
-                        pool.terminate()
-                        pool.join()
+                        pool.close()
                         return True  # Exit once we have the desired number of solutions
-
-            if not any_ready:
-                time.sleep(0.2)  # Wait to prevent deadlock or excessive CPU usage
-
-            pool.terminate()  # Close the multiprocessing pool
-            pool.join()
+            if self.dim == 16:
+                if not any_ready:
+                    time.sleep(0.1)  # Wait to prevent deadlock or excessive CPU usage
+            elif self.dim == 9:
+                if not any_ready:
+                    time.sleep(0.05)
+        pool.close()
         return False
+
 
     def try_value(self, domains, length_values):
         """
