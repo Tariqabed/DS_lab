@@ -461,7 +461,7 @@ class Sudoku_GUI:
 
         # Change color of the current entry
         def change(entry):
-            entry.configure(fg_color='lightblue', bg_color='gray')
+            entry.configure(fg_color='lightsteelblue', bg_color='gray')
 
         related_cells = solver.related_cells[index]
         # Get related cells for the current cell from solver's related_cells
@@ -473,7 +473,7 @@ class Sudoku_GUI:
 
             if related_entry.cget('fg_color') == 'white':
                 # Use lambda to pass the current related_entry to the change_color function
-                self.root.after(40, lambda e=related_entry: change(e))
+                self.root.after(30, lambda e=related_entry: change(e))
 
     def on_focus_out(self, event, widget):
         """
@@ -498,7 +498,7 @@ class Sudoku_GUI:
             cell_row, cell_col = cell
             entry = self.entries_index[cell_row, cell_col]
 
-            if entry.cget('fg_color') == 'lightblue':
+            if entry.cget('fg_color') == 'lightsteelblue':
                 entry.configure(fg_color='white', bg_color='white')
 
 
