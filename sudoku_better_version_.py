@@ -7,10 +7,6 @@ import customtkinter
 from functools import partial
 import re
 import time
-
-
-
-
 class SudokuSolver:
     def __init__(self):
         """
@@ -220,8 +216,6 @@ class SudokuSolver:
 
         return True  # No related cell has the same value, return True
 
-
-
     def enter_element_machine(self, domains, remaining_values, row, col, value):
         """
         Attempts to assign a value to a cell in the Sudoku grid using a machine-driven approach.
@@ -238,7 +232,7 @@ class SudokuSolver:
         """
 
         # Check if the value can be assigned to the cell based on its current domain
-        if value in domains[(row, col)]:
+        if  self.is_valid(domains, row, col, value):
             domains[(row, col)] = {value}  # Assign the value to the cell's domain
 
             # Remove the cell from the remaining values dictionary, as it is now assigned a single value
@@ -280,6 +274,8 @@ class SudokuSolver:
                             return False
                     else:
                         return False  # Return False if the Sudoku is no longer valid
+                elif len(domains[index]) == 0:
+                    return False
 
         return True  # Return True if reduction is successful for all related cells
 
@@ -340,9 +336,6 @@ class SudokuSolver:
         if (row, col) in domains and value in domains[(row, col)]:
             self.remove(domains, length_values, (row, col), value)
 
-
-
-
     def unique_solution(self):
         values = np.array(list(self.length_values.values()))
         elements = np.array(list(self.length_values.keys()))
@@ -369,15 +362,11 @@ class SudokuSolver:
                     if self.solved_sudoku[0]:
                         self.solutions.append(self.solved_sudoku[0])
 
-
-
                 self.domains = {k: v.copy() for k, v in domains_backup.items()}
                 self.length_values = {k: v for k, v in length_values_backup.items()}
-
+                self.remove_element(self.domains, self.length_values, row, col, value)
 
         return True  # Unique solution found
-
-
 
     def Solver(self):
         """
@@ -399,7 +388,25 @@ class SudokuSolver:
         # Perform parallel backtracking to solve the Sudoku puzzle
         return self.parallel_backtrack(self.domains, self.length_values)
 
+    def Non_Parallel_Solver(self):
+        cell = self.get_unfinished_cell(self.domains, self.length_values)
+        if cell is None:
+            return self.domains
 
+        (row, col), possible_values = cell[0], cell[1]
+
+        domains_backup = {k: v.copy() for k, v in self.domains.items()}
+        length_values_backup = {k: v for k, v in self.length_values.items()}
+        for value in possible_values:
+            if self.enter_element_machine(self.domains, self.length_values, row, col, value):
+                result = self.Non_Parallel_Solver()
+                if result:
+                    return result  # Return the solved domains
+
+            self.domains = {k: v.copy() for k, v in domains_backup.items()}
+            self.length_values = {k: v for k, v in length_values_backup.items()}
+
+        return False
 
     def enter_in_parallel(self, row, col, value, domains, length_values):
         """
@@ -445,11 +452,15 @@ class SudokuSolver:
 
         for value in possible_values:
             result = pool.apply_async(self.enter_in_parallel,
-                                          args=(row, col, value, domains.copy(), length_values.copy()))
+                                      args=(row, col, value, domains.copy(), length_values.copy()))
             results.append(result)
 
-        return self.process_results(results ,pool)
-    def process_results(self, results, pool ,solutions = None,max_solutions=1):
+        result = self.process_results(results, pool)
+        pool.close()
+        pool.join()
+        return result
+
+    def process_results(self, results, pool, solutions=None, max_solutions=1):
         """
         Process results obtained from parallel processing tasks until a desired number of solutions is found.
 
@@ -461,32 +472,24 @@ class SudokuSolver:
             bool: True if the desired number of solutions is found, False otherwise.
         """
         while results:
-            any_ready = False
-
+            with self.condition:
+                self.condition.wait(timeout=0.1 if self.dim == 16 else 0.01)
             for result in results:  # Iterate over a copy of the results list
 
                 if result.ready():  # Check if the task is complete
-                    any_ready = True
                     output = result.get()  # Get the result with a timeout
 
-
-                    if output is not None :
+                    if output is not None and output is not False:
                         self.solved_sudoku.append(output)
 
                     results.remove(result)  # Remove the processed result from the list
 
                     if len(self.solved_sudoku) >= max_solutions:
-                        pool.close()
-                        return True  # Exit once we have the desired number of solutions
-            if self.dim == 16:
-                if not any_ready:
-                    time.sleep(0.1)  # Wait to prevent deadlock or excessive CPU usage
-            elif self.dim == 9:
-                if not any_ready:
-                    time.sleep(0.05)
-        pool.close()
-        return False
 
+                        return True  # Exit once we have the desired number of solutions
+
+
+        return False
 
     def try_value(self, domains, length_values):
         """
@@ -528,8 +531,6 @@ class SudokuSolver:
 
         return False  # Return False if no valid solution is found
 
-
-
     def create_sudoku_matrix(self, domains):
         """
         Create a 2D NumPy array representation of the Sudoku grid based on domains.
@@ -561,8 +562,6 @@ class SudokuSolver:
 
         return sudoku_matrix
 
-
-
     def create_sudoku(self):
         # Initialize the matrix with zeros
         self.matrix = np.zeros((self.dim, self.dim)).astype(int)
@@ -578,7 +577,7 @@ class SudokuSolver:
         self.matrix[(first_row - 1).astype(int), first_col_shifted] = first_row
         # Solve the Sudoku to fill the matrix
 
-        self.grid_insert(self.matrix,self.dim)
+        self.grid_insert(self.matrix, self.dim)
 
         self.Solver()
 
@@ -596,22 +595,43 @@ class SudokuSolver:
         # Remove elements to create the puzzle
         self.matrix[row_indices, col_indices] = 0
         return self.matrix
+
+
+
+def matrices_testing(solver):
+    solver.Matrices = []
+    for _ in range(25):
+        matrix = solver.create_sudoku()
+        solver.Matrices.append(matrix)
+
+def parallel_solver(solver):
+    start_time = time.time()
+    for matrix in solver.Matrices:
+        solver.grid_insert(matrix, solver.dim)
+        solver.Solver()
+    end_time = time.time()
+    return end_time - start_time
+
+def non_parallel_solver(solver):
+    start_time = time.time()
+    for matrix in solver.Matrices:
+        solver.grid_insert(matrix, solver.dim)
+        sudoku_matrix = solver.Non_Parallel_Solver()
+    end_time = time.time()
+    return end_time - start_time
+
 if __name__ == "__main__":
-
     solver = SudokuSolver()
-    solver.dim = 9
-    solver.difficulty = 50
+    solver.dim = 16
+    solver.difficulty = 30
+    matrices_testing(solver)
+    parallel_solver_time = parallel_solver(solver)
+    non_parallel_solver_time = non_parallel_solver(solver)
 
 
-    grid = [[0, 0, 6, 5, 0, 8, 4, 0, 0],
-            [0, 2, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 7, 0, 0, 0, 0, 3, 1],
-            [0, 0, 3, 0, 1, 0, 0, 8, 0],
-            [9, 0, 0, 8, 6, 3, 0, 0, 5],
-            [0, 5, 0, 0, 9, 0, 6, 0, 0],
-            [1, 3, 0, 0, 0, 0, 2, 5, 0],
-            [0, 0, 0, 0, 0, 0, 0, 7, 4],
-            [0, 0, 5, 2, 0, 6, 3, 0, 0]]
 
-    solver.grid_insert(grid,  solver.dim)
-    print(solver.unique_solution())
+    print(f"\nNon-Parallel Solver Total Time: {non_parallel_solver_time} seconds")
+    print(f"Parallel Solver Total Time: {parallel_solver_time} seconds")
+
+
+
